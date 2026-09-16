@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>GIMPA Campus Locator</title>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.9.4/mapbox-gl.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="stylesheet/style.css">
+</head>
+<body>
+
+<!-- INTRO -->
+<div class="intro-overlay" id="introOverlay">
+  <div class="intro-video-container">
+    <video id="campusVideo" autoplay muted loop playsinline>
+      <source src="Video/mygimpa.mp4" type="video/mp4">
+    </video>
+    <div id="videoFallback" class="video-fallback-bg">
+      <img src="images/e-gate.jpg"  alt="video fallback" class="fallback-logo">
+      
+    </div>
+    <div class="overlay-content">
+      <img src="images/gimpa_logo.jpg" class="intro-logo" alt="GIMPA">
+      <h2><i class="fas fa-graduation-cap"></i> Welcome to GIMPA Campus Locator</h2>
+      <button class="enter-btn" id="enterAppBtn">Explore Campus →</button>
+      
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="main-app" id="mainApp">
+  <div id="map"></div>
+
+  <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-chevron-left"></i><span>Menu</span></button>
+
+  <div class="glass-sidebar" id="glassSidebar">
+    <div class="drag-handle" id="dragHandle"></div>
+    <div class="sidebar-header">
+      <img src="images/gimpa_logo.jpg" class="brand-logo" alt="GIMPA">
+      <div>
+        <h1>Campus<span>Locator
+          
+        </span></h1>
+        <div class="sub"><i class="fas fa-compass"></i> Live GPS · Voice Input · Hover for details</div>
+      </div>
+    </div>
+    <div class="tab-buttons">
+      <button class="tab-btn active" data-tab="search"><i class="fas fa-search"></i> Discover</button>
+      <button class="tab-btn" data-tab="directions"><i class="fas fa-route"></i> Directions</button>
+    </div>
+    <div class="tab-content">
+      <div class="tab-pane active" id="search-tab">
+        <div class="category-filters" id="category-filters">
+          <button class="cat-chip active" data-cat="all">✨ All</button>
+          <button class="cat-chip" data-cat="hostel">🏠 Hostels</button>
+          <button class="cat-chip" data-cat="lecture">📖 Lecture Halls</button>
+          <button class="cat-chip" data-cat="food">🍔 Food</button>
+          <button class="cat-chip" data-cat="admin">🏛️ Admin</button>
+        </div>
+        <div class="search-box">
+          <input type="text" id="search-input" placeholder="Type or select building...">
+          <button class="voice-input-btn" id="voiceSearchBtn"><i class="fas fa-microphone"></i></button>
+        </div>
+        <div id="search-results"></div>
+        <div class="small-note"><i class="fas fa-hand-pointer"></i> Hover a marker for a quick preview · tap to select</div>
+      </div>
+      <div class="tab-pane" id="directions-tab">
+        <div class="dir-input-group">
+          <label><i class="fas fa-play-circle"></i> Start point</label>
+          <div class="input-wrapper">
+            <input type="text" id="start-input" placeholder="My Location or building name">
+            <button class="voice-input-btn" id="voiceStartBtn"><i class="fas fa-microphone"></i></button>
+          </div>
+        </div>
+        <div class="dir-input-group">
+          <label><i class="fas fa-flag-checkered"></i> Destination</label>
+          <div class="input-wrapper">
+            <input type="text" id="dest-input" placeholder="Select building">
+            <button class="voice-input-btn" id="voiceDestBtn"><i class="fas fa-microphone"></i></button>
+          </div>
+        </div>
+        <button class="dir-btn" id="get-directions-btn"><i class="fas fa-route"></i> Get Route & Navigate</button>
+        <div class="route-info" id="route-info" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fab-container">
+    <button class="fab location-btn" id="locate-btn"><i class="fas fa-location-dot"></i></button>
+    <button class="fab dark-toggle" id="dark-mode-toggle"><i class="fas fa-moon"></i></button>
+    <button class="fab voice-fab" id="global-voice-nav"><i class="fas fa-microphone-alt"></i></button>
+    <button class="fab" id="offline-cache-btn"><i class="fas fa-database"></i></button>
+  </div>
+</div>
+
+<script src="javascript/script.js"></script>
+</body>
+</html>
