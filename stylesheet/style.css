@@ -15,7 +15,7 @@ body{font-family:'Inter','Segoe UI',sans-serif;overflow:hidden;background:var(--
 h1,h2,.popup-title,.sidebar-header h1{font-family:'Poppins',sans-serif;}
 
 /* ============ INTRO ============ */
-.intro-overlay{position:fixed;inset:0;height:120%;background:#000;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .8s ease;}
+.intro-overlay{position:fixed;inset:0;height:100%;height:100dvh;background:#000;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .8s ease;}
 .intro-video-container{width:100%;height:100%;position:relative;overflow:hidden;background:linear-gradient(150deg,var(--blue-dark),var(--green-dark));}
 .intro-video-container video{width:100%;height:100%;object-fit:cover;opacity:.55;}
 .video-fallback-bg {
@@ -46,7 +46,8 @@ h1,h2,.popup-title,.sidebar-header h1{font-family:'Poppins',sans-serif;}
     position: relative;
     z-index: 1;
 }
-.intro-overlay .overlay-content{position:absolute;bottom:12%;left:0;right:0;text-align:center;background:linear-gradient(0deg,rgba(0,0,0,.75),transparent);padding:50px 20px 30px;}
+/* logo, welcome text and button sit in the middle of the screen on every phone */
+.intro-overlay .overlay-content{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;background:radial-gradient(ellipse at center,rgba(0,0,0,.55),rgba(0,0,0,.25) 70%);padding:24px 20px;box-sizing:border-box;}
 .intro-logo{width:150px;height:150px;border-radius:50%;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-bottom:18px;border:3px solid var(--blue);}
 .intro-overlay h2{color:#fff;font-size:1.5rem;font-weight:600;text-shadow:0 2px 10px rgba(0,0,0,.5);margin-bottom:20px;line-height:1.3;}
 .enter-btn{background:linear-gradient(135deg,var(--blue),var(--blue));border:none;padding:14px 36px;font-size:1.05rem;font-weight:700;border-radius:60px;color:#f8f7f5;cursor:pointer;transition:transform .2s;}
@@ -182,3 +183,31 @@ body.dark .suggest-item{color:#e6eef6;}
 .suggest-item i{color:var(--blue);width:16px;text-align:center;}
 .suggest-name{flex:1;}
 .suggest-cat{font-size:.68rem;opacity:.55;text-transform:capitalize;}
+
+/* ============ PHONES: intro sizing ============ */
+@media (max-width:480px){
+  .intro-logo{width:120px;height:120px;margin-bottom:14px;}
+  .intro-overlay h2{font-size:1.25rem;}
+}
+
+/* ============ PHONES: Mapbox controls clear of the bottom panel ============ */
+/* On a phone the panel covers the bottom of the screen, so the compass, location
+   button and map credit move to the top left. Laptops keep them at the bottom right. */
+@media (max-width:768px){
+  .mapboxgl-ctrl-bottom-right{top:calc(env(safe-area-inset-top,0px) + 10px);bottom:auto;right:auto;left:0;
+    display:flex;flex-direction:column;align-items:flex-start;}
+  .mapboxgl-ctrl-bottom-right .mapboxgl-ctrl{margin:0 0 8px 10px;}
+  /* people pinch to zoom on phones; keep only the compass from that group */
+  .mapboxgl-ctrl-zoom-in,.mapboxgl-ctrl-zoom-out{display:none !important;}
+  /* the Mapbox logo stays visible just above the panel (required by Mapbox) */
+  .mapboxgl-ctrl-bottom-left{bottom:calc(58vh + 8px);transition:bottom .3s ease;}
+  body.sidebar-collapsed .mapboxgl-ctrl-bottom-left{bottom:0;}
+}
+
+/* ============ PHONES: round buttons wrap into a second column ============ */
+/* On short phones the column of round buttons was taller than the space above
+   the panel, so the top ones went off screen. Now they wrap into a second column. */
+@media (max-width:768px){
+  .fab-container{flex-wrap:wrap-reverse;align-content:flex-end;max-height:calc(42vh - 62px - 12px);}
+  body.sidebar-collapsed .fab-container{max-height:calc(100vh - 40px);}
+}
