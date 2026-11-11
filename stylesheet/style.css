@@ -204,10 +204,19 @@ body.dark .suggest-item{color:#e6eef6;}
   body.sidebar-collapsed .mapboxgl-ctrl-bottom-left{bottom:0;}
 }
 
-/* ============ PHONES: round buttons wrap into a second column ============ */
-/* On short phones the column of round buttons was taller than the space above
-   the panel, so the top ones went off screen. Now they wrap into a second column. */
+/* ============ PHONES: panel and round buttons ============ */
+/* On a real phone the browser's address bar takes some of the screen, but "vh"
+   sizes assume it isn't there. That pushed the round buttons off the top on some
+   phones (seen on a Tecno Spark). Fixes:
+   - sizes use dvh (the height actually visible), with vh as a fallback
+   - the panel fills the full width of the screen
+   - the round buttons are anchored to the top right, so they can never go off
+     the top, and wrap into a second column when space is short */
 @media (max-width:768px){
-  .fab-container{flex-wrap:wrap-reverse;align-content:flex-end;max-height:calc(42vh - 62px - 12px);}
-  body.sidebar-collapsed .fab-container{max-height:calc(100vh - 40px);}
+  .glass-sidebar{max-width:none;height:58vh;height:58dvh;max-height:none;}
+  .sidebar-toggle{bottom:calc(58vh + 12px);bottom:calc(58dvh + 12px);}
+  .mapboxgl-ctrl-bottom-left{bottom:calc(58vh + 8px);bottom:calc(58dvh + 8px);}
+  .fab-container{top:calc(env(safe-area-inset-top,0px) + 10px);bottom:auto;right:12px;
+    flex-wrap:wrap-reverse;align-content:flex-start;max-height:calc(42vh - 72px);max-height:calc(42dvh - 72px);}
+  body.sidebar-collapsed .fab-container{bottom:auto;max-height:calc(100vh - 90px);max-height:calc(100dvh - 90px);}
 }
