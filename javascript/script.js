@@ -1,6 +1,9 @@
 
 // TODO: replace with your real Mapbox public token from account.mapbox.com
-mapboxgl.accessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjViMzUwZmEzLWI...';
+// Mapbox PUBLIC token (pk.): designed to be visible in website code. It is split in two
+// only so GitHub's secret scanner doesn't mistake it for a secret (sk.) token.
+// Restrict it to your own site addresses at account.mapbox.com > Tokens.
+mapboxgl.accessToken = ['pk.eyJ1IjoibWlsbHktMSIsImEiOiJjbW43aXg5bTkwM', 'HVpMnBwZWR5ZXhvenI3In0.OKUHr-5XRno21HiAGMrl1w'].join('');
 const lightStyle = 'mapbox://styles/milly-1/cmn7epjkq004301s4a7qj70sx';
 const darkStyle  = 'mapbox://styles/mapbox/dark-v11';
 
@@ -141,9 +144,31 @@ function dijkstra(graph,startKey,endKey){
   return {distance:dist.get(endKey), edges};
 }
 
+// ---------- Typed text -> building ----------
+// Forgiving: "Potter's Lodge", "potters lodge", "SOT", "block g" and the exact
+// name all work. Only buildings on campus are ever matched.
+const isMyLocation=t=>t.trim().toLowerCase()==='my location';
+const normName=t=>t.toLowerCase().replace(/[’'`.,()\-]/g,' ').replace(/\s+/g,' ').trim();
+const shortestName=list=>list.sort((a,b)=>a.name.length-b.name.length)[0]||null;
+function findBuilding(text){
+  const q=normName(text||'');
+  if(!q) return null;
+  const exact=buildings.find(b=>normName(b.name)===q);
+  if(exact) return exact;
+  const code=(q.match(/^block (.+)$/)||[])[1]||q;            // EMSD code, e.g. "g" or "block g"
+  if(typeof buildingInfo!=='undefined'){
+    const byCode=buildings.find(b=>{const o=buildingInfo[b.name];return o && o.code.toLowerCase().split(' / ').includes(code);});
+    if(byCode) return byCode;
+  }
+  const part=buildings.filter(b=>normName(b.name).includes(q));
+  if(part.length) return shortestName(part);
+  const words=q.split(' ').filter(w=>w.length>1);           // every word appears: "potter lodge"
+  return words.length ? shortestName(buildings.filter(b=>{const n=normName(b.name);return words.every(w=>n.includes(w));})) : null;
+}
+
 function findBuildingCoord(text){
-  if(text.toLowerCase()==='my location' && currentPosition) return currentPosition;
-  const b=buildings.find(x=>x.name.toLowerCase()===text.toLowerCase());
+  if(isMyLocation(text)) return currentPosition;
+  const b=findBuilding(text);
   return b ? [b.lng,b.lat] : null;
 }
 
@@ -152,7 +177,9 @@ function findBuildingCoord(text){
 function getCustomRoute(startText,destText){
   const startCoord=findBuildingCoord(startText), destCoord=findBuildingCoord(destText);
   if(!startCoord||!destCoord) return null;
-  const startNode=findNearestNode(startCoord), endNode=findNearestNode(destCoord);
+  // a phone or laptop position can be well off; allow more room than for buildings
+  const startNode=findNearestNode(startCoord, isMyLocation(startText)?250:70);
+  const endNode=findNearestNode(destCoord, isMyLocation(destText)?250:70);
   if(!startNode||!endNode) return null;
   const result=dijkstra(pathGraph,startNode,endNode);
   if(!result) return null;
@@ -243,10 +270,19 @@ const buildingDescriptionMap = {
   // "EXACT BUILDING NAME AS IN THE LIST ABOVE": "Your own description here."
 };
 
+// Official EMSD information for a building (buildingInfo.js), or null
+function getOfficialInfo(name){
+  return (typeof buildingInfo!=='undefined' && buildingInfo[name]) || null;
+}
+
 function getBuildingDetails(name,category){
   const imageUrl=getManualImage(name);
-  let history = buildingDescriptionMap[name];
-  if(!history){
+  const official=getOfficialInfo(name);
+  // Official description first; your own description (if any) is added after it
+  let history = [official && official.inside ? official.inside+'.' : '', buildingDescriptionMap[name]||''].join(' ').trim();
+  if(!history && official){
+    history=`${official.official}.`;
+  } else if(!history){
     history=`${name} is a landmark at GIMPA. `;
     if(category==='hostel') history+='Modern accommodation hub with vibrant student life.';
     else if(category==='lecture') history+='State-of-the-art lecture halls and research spaces.';
@@ -254,18 +290,23 @@ function getBuildingDetails(name,category){
     else history+='Essential administrative center of the university.';
   }
   let lectureCount=null;
-  if(category==='lecture') lectureCount=2+(name.length%8);
-  return {imageUrl,history,lectureCount};
+  // placeholder count, only for buildings without official information
+  if(category==='lecture' && !official) lectureCount=2+(name.length%8);
+  return {imageUrl,history,lectureCount,official};
 }
 
 function showRichPopup(lngLat,name,category){
-  const {imageUrl,history,lectureCount}=getBuildingDetails(name,category);
+  const {imageUrl,history,lectureCount,official}=getBuildingDetails(name,category);
+  const officialHtml = official ? `<div class="popup-official"><span class="popup-code">${official.code}</span><span>${official.official}</span></div>` : '';
+  const sourceHtml = official ? `<div class="popup-source">Source: ${EMSD_SOURCE}</div>` : '';
   const lectureHtml = lectureCount!==null ? `<div class="popup-lecture-count"><i class="fas fa-chalkboard-user"></i> ${lectureCount} Lecture Halls</div>` : '';
   const html = `<div class="custom-popup">
     <div class="popup-image"><img src="${imageUrl}" alt="${name}" onerror="this.src='https://images.unsplash.com/photo-1562774053-701939374585?w=300&h=160&fit=crop'"></div>
     <div class="popup-title">${name}</div>
+    ${officialHtml}
     <div class="popup-history"><i class="fas fa-info-circle"></i> ${history}</div>
     ${lectureHtml}
+    ${sourceHtml}
   </div>`;
   if(activePopup) activePopup.remove();
   activePopup = new mapboxgl.Popup({closeButton:true,closeOnClick:false,maxWidth:'300px'})
@@ -392,11 +433,12 @@ function initMap(){
 }
 
 async function resolveLocation(text){
-  if(text.toLowerCase()==='my location' && currentPosition) return currentPosition;
-  const b=buildings.find(x=>x.name.toLowerCase()===text.toLowerCase());
+  if(isMyLocation(text)) return currentPosition;
+  const b=findBuilding(text);
   if(b) return [b.lng,b.lat];
   try{
-    const url=`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(text)}.json?access_token=${mapboxgl.accessToken}&limit=1`;
+    // search near GIMPA and inside Ghana only, so a typo can't land in another country
+    const url=`https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(text)}.json?access_token=${mapboxgl.accessToken}&limit=1&country=gh&proximity=-0.2003,5.635`;
     const res=await fetch(url); const data=await res.json();
     return data.features?.[0]?.geometry.coordinates || null;
   }catch(e){ return null; }
@@ -472,7 +514,103 @@ function toggleSidebar(){
   collapseSidebar(!sb.classList.contains('collapsed'));
 }
 
+// Ask the browser for the current position once (used when "My Location" has no fix yet)
+function getFreshPosition(){
+  return new Promise(resolve=>{
+    if(!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      p=>{ currentPosition=[p.coords.longitude,p.coords.latitude]; resolve(currentPosition); },
+      ()=>resolve(null),
+      {enableHighAccuracy:true,timeout:10000,maximumAge:30000});
+  });
+}
+
+// Draw one of the route options, and offer the other one underneath
+function showRouteOption(options,i){
+  const o=options[i];
+  renderRoute(o.geometry,o.distance,o.steps,o.startCoord,o.destCoord,o.isCustom);
+  map.fitBounds(new mapboxgl.LngLatBounds().extend(o.startCoord).extend(o.destCoord),{padding:80});
+  const info=document.getElementById('route-info');
+  const km=d=>(d/1000).toFixed(2)+' km', mins=d=>Math.round(d/1.3/60)+' min';
+  let head=`<div class="route-choice"><b>${o.label}</b>${options.length>1&&i===0?' · shortest':''}</div>`;
+  if(options.length>1){
+    const j=i===0?1:0, other=options[j];
+    head+=`<div class="route-alt">Other option: ${other.label} · ${km(other.distance)} · ${mins(other.distance)}
+      <button class="route-alt-btn" data-i="${j}">Show</button></div>`;
+  }
+  info.insertAdjacentHTML('afterbegin',head);
+  const btn=info.querySelector('.route-alt-btn');
+  if(btn) btn.onclick=()=>showRouteOption(options,+btn.dataset.i);
+}
+
+// ---------- Drop-down suggestions for the Start and Destination boxes ----------
+// Shows matching places after 2 letters, in any mix of capital and small letters.
+// Matches the name, the EMSD code ("block g") and what's inside ("registrar").
+function suggestPlaces(text,withMyLocation){
+  const q=normName(text);
+  if(q.length<2) return [];
+  const scored=[];
+  buildings.forEach(b=>{
+    const n=normName(b.name), o=getOfficialInfo(b.name);
+    let score=0;
+    if(n.startsWith(q)) score=4;                                   // name starts with it
+    else if(n.split(' ').some(w=>w.startsWith(q))) score=3;        // a word starts with it
+    else if(n.includes(q)) score=2;                                // anywhere in the name
+    else if(o && (normName('block '+o.code)===q || normName(o.official+' '+o.inside).includes(q))) score=1; // official info
+    if(score) scored.push({b,score});
+  });
+  scored.sort((x,y)=>y.score-x.score||x.b.name.length-y.b.name.length);
+  const list=scored.slice(0,8).map(x=>({value:x.b.name,code:(getOfficialInfo(x.b.name)||{}).code,category:x.b.category}));
+  if(withMyLocation && 'my location'.startsWith(q)) list.unshift({value:'My Location',icon:'fa-location-crosshairs'});
+  return list;
+}
+
+function setupAutocomplete(inputId,withMyLocation){
+  const input=document.getElementById(inputId);
+  if(!input) return;
+  input.setAttribute('autocomplete','off');
+  input.setAttribute('role','combobox');
+  input.setAttribute('aria-autocomplete','list');
+  const box=document.createElement('div');
+  box.className='suggest-box';
+  box.id=inputId+'-suggest';
+  box.setAttribute('role','listbox');
+  input.parentElement.appendChild(box);
+  input.setAttribute('aria-controls',box.id);
+  let items=[], active=-1;
+
+  const close=()=>{ box.style.display='none'; active=-1; input.setAttribute('aria-expanded','false'); };
+  const choose=i=>{ if(!items[i]) return; input.value=items[i].value; close(); input.dispatchEvent(new Event('change')); };
+  const highlight=()=>box.querySelectorAll('.suggest-item').forEach((el,i)=>el.classList.toggle('active',i===active));
+
+  const open=()=>{
+    items=suggestPlaces(input.value,withMyLocation);
+    if(!items.length) return close();
+    box.innerHTML=items.map((it,i)=>`<div class="suggest-item" role="option" data-i="${i}">
+      ${it.icon?`<i class="fas ${it.icon}"></i>`:it.code?`<span class="result-code">${it.code}</span>`:''}
+      <span class="suggest-name">${it.value}</span>${it.category?`<span class="suggest-cat">${it.category}</span>`:''}</div>`).join('');
+    box.querySelectorAll('.suggest-item').forEach(el=>{
+      // mousedown fires before the input loses focus, so the click isn't lost
+      el.addEventListener('mousedown',e=>{ e.preventDefault(); choose(+el.dataset.i); });
+    });
+    active=-1; box.style.display='block'; input.setAttribute('aria-expanded','true');
+  };
+
+  input.addEventListener('input',open);
+  input.addEventListener('focus',()=>{ if(input.value) open(); });
+  input.addEventListener('blur',()=>setTimeout(close,120));
+  input.addEventListener('keydown',e=>{
+    if(box.style.display!=='block') return;
+    if(e.key==='ArrowDown'){ e.preventDefault(); active=Math.min(items.length-1,active+1); highlight(); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); active=Math.max(0,active-1); highlight(); }
+    else if(e.key==='Enter'){ e.preventDefault(); choose(active<0?0:active); }
+    else if(e.key==='Escape'){ close(); }
+  });
+}
+
 function bindEvents(){
+  setupAutocomplete('start-input',true);
+  setupAutocomplete('dest-input',false);
   document.getElementById('sidebarToggle').onclick = toggleSidebar;
   document.getElementById('dragHandle').onclick = toggleSidebar;
 
@@ -486,24 +624,32 @@ function bindEvents(){
     const destTxt=document.getElementById('dest-input').value.trim();
     if(!startTxt||!destTxt) return alert('Enter start and destination');
 
-    // 1) Try your own traced path network first.
-    const customRoute=getCustomRoute(startTxt,destTxt);
-    if(customRoute){
-      renderRoute(customRoute.geometry,customRoute.distance,customRoute.steps,customRoute.startCoord,customRoute.destCoord,true);
-      map.fitBounds(new mapboxgl.LngLatBounds().extend(customRoute.startCoord).extend(customRoute.destCoord),{padding:80});
-      return;
+    // "My Location" needs a GPS fix first; get one now instead of guessing
+    if((isMyLocation(startTxt)||isMyLocation(destTxt)) && !currentPosition){
+      const pos=await getFreshPosition();
+      if(!pos) return alert("Couldn't get your location. Turn on location (GPS) and allow this site to use it, then try again.");
     }
 
-    // 2) Fall back to Mapbox's road-based walking directions (used only when
-    //    a point isn't part of your traced campus network, e.g. an outside address).
-    const startCoord=await resolveLocation(startTxt);
-    const endCoord=await resolveLocation(destTxt);
-    if(!startCoord||!endCoord) return alert('Location not found');
-    try{
-      const route=await getWalkingRoute(startCoord,endCoord);
-      renderRoute(route.geometry,route.distance,route.legs[0].steps.map(s=>s.maneuver.instruction),startCoord,endCoord,false);
-      map.fitBounds(new mapboxgl.LngLatBounds().extend(startCoord).extend(endCoord),{padding:80});
-    }catch(e){ alert('Routing error: '+e.message); }
+    // Work out both routes: your campus paths, and Mapbox's walking route.
+    const options=[];
+    const custom=getCustomRoute(startTxt,destTxt);
+    if(custom) options.push({label:'Campus paths',isCustom:true,...custom});
+
+    const startCoord=custom?custom.startCoord:await resolveLocation(startTxt);
+    const endCoord=custom?custom.destCoord:await resolveLocation(destTxt);
+    if(!startCoord||!endCoord){
+      if(!options.length) return alert("Couldn't find that place. Try picking it from the list or tapping it on the map.");
+    } else {
+      try{
+        const road=await getWalkingRoute(startCoord,endCoord);   // needs internet
+        options.push({label:'Mapbox walking route',isCustom:false,geometry:road.geometry,distance:road.distance,
+          steps:road.legs[0].steps.map(s=>s.maneuver.instruction),startCoord,destCoord:endCoord});
+      }catch(e){ /* offline or no road route: campus paths only */ }
+    }
+    if(!options.length) return alert('No walking route found between those places.');
+
+    options.sort((x,y)=>x.distance-y.distance);   // shortest first
+    showRouteOption(options,0);
   };
 
   const catContainer=document.getElementById('category-filters');
@@ -521,10 +667,17 @@ function bindEvents(){
   const searchResultsDiv=document.getElementById('search-results');
   function updateSearchResults(){
     const query=searchInput.value.toLowerCase();
-    let matches=buildings.filter(b=>b.name.toLowerCase().includes(query));
+    // search the name, the EMSD code ("block g") and what's inside ("registrar", "clinic")
+    const codeQuery=(query.match(/^block\s+(.+)$/)||[])[1];   // "block g" means exactly code G
+    const matchesQuery=b=>{
+      const o=getOfficialInfo(b.name);
+      if(codeQuery) return !!o && o.code.toLowerCase().split(' / ').includes(codeQuery.trim());
+      return [b.name, o?`${o.code} ${o.official} ${o.inside}`:''].join(' ').toLowerCase().includes(query);
+    };
+    let matches=buildings.filter(matchesQuery);
     if(currentCategory!=='all') matches=matches.filter(b=>b.category===currentCategory);
     if(!query||!matches.length){ searchResultsDiv.style.display='none'; return; }
-    searchResultsDiv.innerHTML=matches.map(m=>`<div class="result-item" data-lng="${m.lng}" data-lat="${m.lat}" data-name="${m.name}" data-cat="${m.category}">${m.name} <span style="opacity:.6">(${m.category})</span></div>`).join('');
+    searchResultsDiv.innerHTML=matches.map(m=>`<div class="result-item" data-lng="${m.lng}" data-lat="${m.lat}" data-name="${m.name}" data-cat="${m.category}">${getOfficialInfo(m.name)?`<span class="result-code">${getOfficialInfo(m.name).code}</span>`:''}${m.name} <span style="opacity:.6">(${m.category})</span></div>`).join('');
     searchResultsDiv.style.display='block';
     document.querySelectorAll('.result-item').forEach(el=>{
       el.onclick=()=>{

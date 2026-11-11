@@ -1,0 +1,93 @@
+/* ============ OUTDOOR AR NAVIGATION ============ */
+.fab.ar-fab{background:linear-gradient(135deg,var(--gold),var(--gold-dark));color:#1a1200;}
+.fab.ar-fab span{font:700 .95rem 'Poppins',sans-serif;letter-spacing:.02em;}
+
+.ar-overlay{
+  position:fixed;inset:0;z-index:2000;display:none;overflow:hidden;
+  background:linear-gradient(160deg,var(--blue-dark),var(--green-dark));
+  color:#fff;font-family:'Inter',sans-serif;
+}
+.ar-overlay.open{display:block;}
+
+.ar-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+.ar-overlay.no-camera .ar-video{display:none;}
+.ar-scrim{
+  position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(180deg,rgba(0,0,0,.5) 0,transparent 24%,transparent 52%,rgba(0,0,0,.65) 100%);
+}
+
+/* top bar */
+.ar-top{
+  position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;
+  padding:calc(env(safe-area-inset-top,0px) + 12px) 14px 0;
+}
+.ar-close{
+  width:44px;height:44px;flex-shrink:0;border:none;border-radius:50%;cursor:pointer;
+  background:rgba(18,24,31,.78);color:#fff;font-size:1.1rem;
+}
+.ar-dest{
+  flex:1;min-width:0;height:44px;padding:0 18px;border-radius:30px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.28);background:rgba(18,24,31,.78);color:#fff;
+  font:600 .88rem 'Inter',sans-serif;text-overflow:ellipsis;
+  appearance:none;-webkit-appearance:none;
+}
+.ar-dest option{color:#12181F;background:#fff;}
+.ar-overlay button:focus-visible,.ar-dest:focus-visible{outline:3px solid var(--gold);outline-offset:2px;}
+
+/* destination pin, floats over the building when it is inside the camera view */
+.ar-pin{
+  position:absolute;top:36%;left:50%;display:none;flex-direction:column;align-items:center;
+  transform:translate(-50%,-100%);pointer-events:none;
+}
+.ar-pin.show{display:flex;}
+.ar-pin-label{
+  max-width:210px;padding:7px 13px;border-radius:14px;text-align:center;
+  background:rgba(10,16,14,.84);border:1px solid var(--gold);
+}
+.ar-pin-label b{display:block;font:600 .8rem/1.25 'Poppins',sans-serif;}
+.ar-pin-label span{font-size:.72rem;opacity:.8;}
+.ar-pin i{margin-top:5px;font-size:1.9rem;color:var(--gold);filter:drop-shadow(0 4px 6px rgba(0,0,0,.6));}
+
+/* the ground arrow: a flat plane tilted back so it looks painted on the path */
+.ar-stage{
+  position:absolute;left:50%;bottom:31%;width:0;height:0;
+  perspective:520px;pointer-events:none;transition:opacity .25s;
+}
+.ar-arrow{
+  position:absolute;left:-65px;top:-87px;width:130px;height:174px;
+  transform:rotateX(58deg) rotateZ(0deg);will-change:transform;
+  filter:drop-shadow(0 10px 14px rgba(0,0,0,.55));
+}
+.ar-arrow svg{display:block;width:100%;height:100%;}
+.ar-arrow .arrow-fill{fill:var(--gold);transition:fill .2s;}
+.ar-arrow.aligned .arrow-fill{fill:#4BE07F;}
+.ar-arrow .arrow-edge{fill:none;stroke:#fff;stroke-width:5;stroke-linejoin:round;}
+
+/* bottom panel */
+.ar-hud{
+  position:absolute;left:0;right:0;bottom:0;
+  padding:0 14px calc(env(safe-area-inset-bottom,0px) + 14px);
+}
+.ar-card{
+  padding:16px 18px;border-radius:24px;border:1px solid rgba(255,255,255,.12);
+  background:rgba(10,16,14,.8);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+}
+.ar-msg{font:600 1.02rem/1.3 'Poppins',sans-serif;min-height:1.3em;}
+.ar-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-top:12px;}
+.ar-dist{font:700 1.9rem/1 'Poppins',sans-serif;}
+.ar-sub{margin-top:5px;font-size:.78rem;opacity:.75;}
+.ar-status{
+  display:flex;align-items:center;gap:8px;padding:8px 13px;border-radius:30px;cursor:pointer;
+  border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font:500 .76rem 'Inter',sans-serif;
+}
+.ar-dot{width:9px;height:9px;border-radius:50%;background:#9aa3ab;}
+.ar-dot.good{background:#4BE07F;}
+.ar-dot.ok{background:#F2C14E;}
+.ar-dot.bad{background:#FF6B5B;}
+.ar-debug{
+  display:none;margin-top:12px;font:.68rem/1.5 ui-monospace,Menlo,Consolas,monospace;
+  white-space:pre-wrap;opacity:.85;
+}
+.ar-debug.show{display:block;}
+
+@media (prefers-reduced-motion:reduce){.ar-stage{transition:none;}}

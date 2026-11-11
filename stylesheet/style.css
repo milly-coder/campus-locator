@@ -47,9 +47,9 @@ h1,h2,.popup-title,.sidebar-header h1{font-family:'Poppins',sans-serif;}
     z-index: 1;
 }
 .intro-overlay .overlay-content{position:absolute;bottom:12%;left:0;right:0;text-align:center;background:linear-gradient(0deg,rgba(0,0,0,.75),transparent);padding:50px 20px 30px;}
-.intro-logo{width:150px;height:150px;border-radius:50%;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-bottom:18px;border:3px solid var(--gold);}
+.intro-logo{width:150px;height:150px;border-radius:50%;box-shadow:0 8px 30px rgba(0,0,0,.5);margin-bottom:18px;border:3px solid var(--blue);}
 .intro-overlay h2{color:#fff;font-size:1.5rem;font-weight:600;text-shadow:0 2px 10px rgba(0,0,0,.5);margin-bottom:20px;line-height:1.3;}
-.enter-btn{background:linear-gradient(135deg,var(--gold),var(--gold-dark));border:none;padding:14px 36px;font-size:1.05rem;font-weight:700;border-radius:60px;color:#1a1200;cursor:pointer;transition:transform .2s;}
+.enter-btn{background:linear-gradient(135deg,var(--blue),var(--blue));border:none;padding:14px 36px;font-size:1.05rem;font-weight:700;border-radius:60px;color:#f8f7f5;cursor:pointer;transition:transform .2s;}
 .enter-btn:hover{transform:scale(1.05);}
 .skip-text{margin-top:16px;color:rgba(255,255,255,.75);font-size:.8rem;cursor:pointer;}
 
@@ -156,3 +156,29 @@ body.sidebar-collapsed .fab-container{bottom:20px;}
 .drag-handle{display:none;}
 @media (max-width:768px){.drag-handle{display:block;width:44px;height:5px;background:rgba(11,95,168,.35);border-radius:3px;margin:10px auto 0;}
 body.dark .drag-handle{background:rgba(255,255,255,.3);}}
+/* ============ OFFICIAL (EMSD) BUILDING INFO ============ */
+.popup-official{display:flex;align-items:center;gap:8px;margin:2px 0 8px;font-size:.78rem;color:#4a5560;}
+.popup-code,.result-code{display:inline-block;background:var(--blue);color:#fff;font-weight:700;font-size:.72rem;
+  padding:2px 8px;border-radius:20px;white-space:nowrap;}
+.result-code{margin-right:8px;}
+.popup-source{margin-top:8px;font-size:.68rem;color:#7a858f;}
+
+/* ============ ROUTE OPTIONS ============ */
+.route-choice{font-size:.85rem;margin-bottom:6px;color:var(--blue-dark);}
+body.dark .route-choice{color:#cfe3f5;}
+.route-alt{font-size:.75rem;opacity:.85;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.route-alt-btn{border:1px solid var(--blue);background:transparent;color:var(--blue);border-radius:20px;padding:3px 12px;
+  font-weight:600;font-size:.72rem;cursor:pointer;}
+body.dark .route-alt-btn{color:#9fd0ff;border-color:#9fd0ff;}
+
+/* ============ DROP-DOWN SUGGESTIONS (Start / Destination) ============ */
+.suggest-box{display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:40;background:#fff;
+  border:1px solid rgba(11,95,168,.18);border-radius:16px;box-shadow:0 10px 28px rgba(0,0,0,.18);
+  max-height:260px;overflow-y:auto;padding:4px;}
+body.dark .suggest-box{background:#18212b;border-color:rgba(255,255,255,.15);}
+.suggest-item{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:.82rem;color:var(--ink);}
+body.dark .suggest-item{color:#e6eef6;}
+.suggest-item:hover,.suggest-item.active{background:rgba(216,166,42,.18);}
+.suggest-item i{color:var(--blue);width:16px;text-align:center;}
+.suggest-name{flex:1;}
+.suggest-cat{font-size:.68rem;opacity:.55;text-transform:capitalize;}
