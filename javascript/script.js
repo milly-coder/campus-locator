@@ -376,9 +376,7 @@ function addBuildingPointsLayer(){
   map.on('click','building-circles',(e)=>{
     const p=e.features[0].properties;
     hideHoverPreview();
-    map.flyTo({center:e.lngLat,zoom:18});
-    showRichPopup(e.lngLat,p.name,p.category);
-    document.getElementById('dest-input').value=p.name;
+    if(typeof openPlace==='function') openPlace(p.name);   // place card, in ui.js
   });
 }
 
@@ -446,10 +444,15 @@ async function resolveLocation(text){
 
 function speakText(text){
   if(!speechSynth) return;
+  if(window.appSettings && !window.appSettings.voiceGuidance) return;   // switched off in Settings
   speechSynth.cancel();
-  const u=new SpeechSynthesisUtterance(text); u.lang='en-US'; u.rate=0.9;
+  const u=new SpeechSynthesisUtterance(text); u.lang='en-US'; u.rate=0.95;
+  const v=(speechSynth.getVoices()||[]).find(x=>/^en(-|_)/i.test(x.lang));
+  if(v) u.voice=v;
   speechSynth.speak(u);
 }
+// Phones load their voices slowly the first time; asking early makes the first sentence quicker
+if(speechSynth){ speechSynth.getVoices(); speechSynth.onvoiceschanged=()=>speechSynth.getVoices(); }
 
 async function getWalkingRoute(startCoord,endCoord){
   const url=`https://api.mapbox.com/directions/v5/mapbox/walking/${startCoord[0]},${startCoord[1]};${endCoord[0]},${endCoord[1]}?steps=true&geometries=geojson&access_token=${mapboxgl.accessToken}`;
@@ -480,38 +483,17 @@ function renderRoute(geometry,distanceMeters,steps,startCoord,endCoord,isCustom)
   startMarker=new mapboxgl.Marker({color:'#1B7A3D'}).setLngLat(startCoord).addTo(map);
   endMarker=new mapboxgl.Marker({color:'#D9A62A'}).setLngLat(endCoord).addTo(map);
 
-  const durationSec=distanceMeters/1.3; // ~ average walking pace
-  const stepsHtml = steps.length ? `<ul>${steps.map(s=>`<li>${s}</li>`).join('')}</ul>` : '';
-  document.getElementById('route-info').innerHTML=`<div><i class="fas fa-walking"></i> ${(distanceMeters/1000).toFixed(2)} km · ${Math.round(durationSec/60)} min${isCustom?' · via your campus paths':''}</div><div class="step-by-step">${stepsHtml}</div>`;
-  document.getElementById('route-info').style.display='block';
-  speakText(`Route found. ${(distanceMeters/1000).toFixed(2)} kilometers, about ${Math.round(durationSec/60)} minutes.`);
-
   isNavigating=true;
   setPathsNetworkDim(true);
-  if(document.getElementById('start-input').value.toLowerCase()==='my location') geolocateControl.trigger();
-  collapseSidebar(true);
+  if(isMyLocation(document.getElementById('start-input').value)) startTracking();
 }
 
-// ---------- Sidebar collapse / expand ----------
-function isMobile(){ return window.matchMedia('(max-width:768px)').matches; }
-function collapseSidebar(collapsed){
-  const sb=document.getElementById('glassSidebar');
-  const tg=document.getElementById('sidebarToggle');
-  sb.classList.toggle('collapsed',collapsed);
-  tg.classList.toggle('collapsed-pos',collapsed);
-  document.body.classList.toggle('sidebar-collapsed',collapsed);
-  const icon=tg.querySelector('i');
-  const label=tg.querySelector('span');
-  if(isMobile()){
-    icon.className = collapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
-  } else {
-    icon.className = collapsed ? 'fas fa-chevron-right' : 'fas fa-chevron-left';
-  }
-  label.textContent = collapsed ? 'Menu' : 'Hide';
-}
-function toggleSidebar(){
-  const sb=document.getElementById('glassSidebar');
-  collapseSidebar(!sb.classList.contains('collapsed'));
+// Start following the user's location, without switching it off if it's already on
+// (the Mapbox control's trigger() toggles, so a second call would stop tracking)
+function startTracking(){
+  if(!geolocateControl) return;
+  const st=geolocateControl._watchState;
+  if(!st || st==='OFF' || st==='BACKGROUND') geolocateControl.trigger();
 }
 
 // Ask the browser for the current position once (used when "My Location" has no fix yet)
@@ -523,24 +505,6 @@ function getFreshPosition(){
       ()=>resolve(null),
       {enableHighAccuracy:true,timeout:10000,maximumAge:30000});
   });
-}
-
-// Draw one of the route options, and offer the other one underneath
-function showRouteOption(options,i){
-  const o=options[i];
-  renderRoute(o.geometry,o.distance,o.steps,o.startCoord,o.destCoord,o.isCustom);
-  map.fitBounds(new mapboxgl.LngLatBounds().extend(o.startCoord).extend(o.destCoord),{padding:80});
-  const info=document.getElementById('route-info');
-  const km=d=>(d/1000).toFixed(2)+' km', mins=d=>Math.round(d/1.3/60)+' min';
-  let head=`<div class="route-choice"><b>${o.label}</b>${options.length>1&&i===0?' · shortest':''}</div>`;
-  if(options.length>1){
-    const j=i===0?1:0, other=options[j];
-    head+=`<div class="route-alt">Other option: ${other.label} · ${km(other.distance)} · ${mins(other.distance)}
-      <button class="route-alt-btn" data-i="${j}">Show</button></div>`;
-  }
-  info.insertAdjacentHTML('afterbegin',head);
-  const btn=info.querySelector('.route-alt-btn');
-  if(btn) btn.onclick=()=>showRouteOption(options,+btn.dataset.i);
 }
 
 // ---------- Drop-down suggestions for the Start and Destination boxes ----------
@@ -563,170 +527,6 @@ function suggestPlaces(text,withMyLocation){
   const list=scored.slice(0,8).map(x=>({value:x.b.name,code:(getOfficialInfo(x.b.name)||{}).code,category:x.b.category}));
   if(withMyLocation && 'my location'.startsWith(q)) list.unshift({value:'My Location',icon:'fa-location-crosshairs'});
   return list;
-}
-
-function setupAutocomplete(inputId,withMyLocation){
-  const input=document.getElementById(inputId);
-  if(!input) return;
-  input.setAttribute('autocomplete','off');
-  input.setAttribute('role','combobox');
-  input.setAttribute('aria-autocomplete','list');
-  const box=document.createElement('div');
-  box.className='suggest-box';
-  box.id=inputId+'-suggest';
-  box.setAttribute('role','listbox');
-  input.parentElement.appendChild(box);
-  input.setAttribute('aria-controls',box.id);
-  let items=[], active=-1;
-
-  const close=()=>{ box.style.display='none'; active=-1; input.setAttribute('aria-expanded','false'); };
-  const choose=i=>{ if(!items[i]) return; input.value=items[i].value; close(); input.dispatchEvent(new Event('change')); };
-  const highlight=()=>box.querySelectorAll('.suggest-item').forEach((el,i)=>el.classList.toggle('active',i===active));
-
-  const open=()=>{
-    items=suggestPlaces(input.value,withMyLocation);
-    if(!items.length) return close();
-    box.innerHTML=items.map((it,i)=>`<div class="suggest-item" role="option" data-i="${i}">
-      ${it.icon?`<i class="fas ${it.icon}"></i>`:it.code?`<span class="result-code">${it.code}</span>`:''}
-      <span class="suggest-name">${it.value}</span>${it.category?`<span class="suggest-cat">${it.category}</span>`:''}</div>`).join('');
-    box.querySelectorAll('.suggest-item').forEach(el=>{
-      // mousedown fires before the input loses focus, so the click isn't lost
-      el.addEventListener('mousedown',e=>{ e.preventDefault(); choose(+el.dataset.i); });
-    });
-    active=-1; box.style.display='block'; input.setAttribute('aria-expanded','true');
-  };
-
-  input.addEventListener('input',open);
-  input.addEventListener('focus',()=>{ if(input.value) open(); });
-  input.addEventListener('blur',()=>setTimeout(close,120));
-  input.addEventListener('keydown',e=>{
-    if(box.style.display!=='block') return;
-    if(e.key==='ArrowDown'){ e.preventDefault(); active=Math.min(items.length-1,active+1); highlight(); }
-    else if(e.key==='ArrowUp'){ e.preventDefault(); active=Math.max(0,active-1); highlight(); }
-    else if(e.key==='Enter'){ e.preventDefault(); choose(active<0?0:active); }
-    else if(e.key==='Escape'){ close(); }
-  });
-}
-
-function bindEvents(){
-  setupAutocomplete('start-input',true);
-  setupAutocomplete('dest-input',false);
-  document.getElementById('sidebarToggle').onclick = toggleSidebar;
-  document.getElementById('dragHandle').onclick = toggleSidebar;
-
-  document.getElementById('locate-btn').onclick=()=>{
-    geolocateControl.trigger();
-    document.getElementById('start-input').value='My Location';
-  };
-
-  document.getElementById('get-directions-btn').onclick=async ()=>{
-    const startTxt=document.getElementById('start-input').value.trim();
-    const destTxt=document.getElementById('dest-input').value.trim();
-    if(!startTxt||!destTxt) return alert('Enter start and destination');
-
-    // "My Location" needs a GPS fix first; get one now instead of guessing
-    if((isMyLocation(startTxt)||isMyLocation(destTxt)) && !currentPosition){
-      const pos=await getFreshPosition();
-      if(!pos) return alert("Couldn't get your location. Turn on location (GPS) and allow this site to use it, then try again.");
-    }
-
-    // Work out both routes: your campus paths, and Mapbox's walking route.
-    const options=[];
-    const custom=getCustomRoute(startTxt,destTxt);
-    if(custom) options.push({label:'Campus paths',isCustom:true,...custom});
-
-    const startCoord=custom?custom.startCoord:await resolveLocation(startTxt);
-    const endCoord=custom?custom.destCoord:await resolveLocation(destTxt);
-    if(!startCoord||!endCoord){
-      if(!options.length) return alert("Couldn't find that place. Try picking it from the list or tapping it on the map.");
-    } else {
-      try{
-        const road=await getWalkingRoute(startCoord,endCoord);   // needs internet
-        options.push({label:'Mapbox walking route',isCustom:false,geometry:road.geometry,distance:road.distance,
-          steps:road.legs[0].steps.map(s=>s.maneuver.instruction),startCoord,destCoord:endCoord});
-      }catch(e){ /* offline or no road route: campus paths only */ }
-    }
-    if(!options.length) return alert('No walking route found between those places.');
-
-    options.sort((x,y)=>x.distance-y.distance);   // shortest first
-    showRouteOption(options,0);
-  };
-
-  const catContainer=document.getElementById('category-filters');
-  catContainer.querySelectorAll('.cat-chip').forEach(chip=>{
-    chip.onclick=()=>{
-      catContainer.querySelectorAll('.cat-chip').forEach(c=>c.classList.remove('active'));
-      chip.classList.add('active');
-      currentCategory=chip.dataset.cat;
-      filterBuildingsByCategory(currentCategory);
-      updateSearchResults();
-    };
-  });
-
-  const searchInput=document.getElementById('search-input');
-  const searchResultsDiv=document.getElementById('search-results');
-  function updateSearchResults(){
-    const query=searchInput.value.toLowerCase();
-    // search the name, the EMSD code ("block g") and what's inside ("registrar", "clinic")
-    const codeQuery=(query.match(/^block\s+(.+)$/)||[])[1];   // "block g" means exactly code G
-    const matchesQuery=b=>{
-      const o=getOfficialInfo(b.name);
-      if(codeQuery) return !!o && o.code.toLowerCase().split(' / ').includes(codeQuery.trim());
-      return [b.name, o?`${o.code} ${o.official} ${o.inside}`:''].join(' ').toLowerCase().includes(query);
-    };
-    let matches=buildings.filter(matchesQuery);
-    if(currentCategory!=='all') matches=matches.filter(b=>b.category===currentCategory);
-    if(!query||!matches.length){ searchResultsDiv.style.display='none'; return; }
-    searchResultsDiv.innerHTML=matches.map(m=>`<div class="result-item" data-lng="${m.lng}" data-lat="${m.lat}" data-name="${m.name}" data-cat="${m.category}">${getOfficialInfo(m.name)?`<span class="result-code">${getOfficialInfo(m.name).code}</span>`:''}${m.name} <span style="opacity:.6">(${m.category})</span></div>`).join('');
-    searchResultsDiv.style.display='block';
-    document.querySelectorAll('.result-item').forEach(el=>{
-      el.onclick=()=>{
-        const lng=parseFloat(el.dataset.lng), lat=parseFloat(el.dataset.lat), name=el.dataset.name, cat=el.dataset.cat;
-        map.flyTo({center:[lng,lat],zoom:18});
-        showRichPopup([lng,lat],name,cat);
-        document.getElementById('dest-input').value=name;
-        searchResultsDiv.style.display='none';
-      };
-    });
-  }
-  searchInput.addEventListener('input',updateSearchResults);
-
-  const voiceFn=(callback)=>{
-    const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-    if(!SpeechRecognition){ alert('🎤 Voice recognition not supported on this device/browser'); return; }
-    const recognition=new SpeechRecognition();
-    recognition.lang='en-US'; recognition.interimResults=false; recognition.maxAlternatives=1;
-    recognition.start();
-    recognition.onresult=(event)=>callback(event.results[0][0].transcript);
-    recognition.onerror=(event)=>{ console.error(event); alert('Voice recognition failed. Please try again.'); };
-  };
-
-  document.getElementById('voiceSearchBtn').onclick=()=>voiceFn(t=>{ searchInput.value=t; updateSearchResults(); });
-  document.getElementById('voiceStartBtn').onclick=()=>voiceFn(t=>document.getElementById('start-input').value=t);
-  document.getElementById('voiceDestBtn').onclick=()=>voiceFn(t=>document.getElementById('dest-input').value=t);
-  document.getElementById('global-voice-nav').onclick=()=>voiceFn(t=>{ searchInput.value=t; updateSearchResults(); });
-
-  let dark=false;
-  document.getElementById('dark-mode-toggle').onclick=()=>{
-    dark=!dark;
-    document.body.classList.toggle('dark',dark);
-    map.setStyle(dark?darkStyle:lightStyle);
-    map.once('style.load',()=>{
-      addBuildingPointsLayer();
-      if(currentRouteGeometry) restoreRouteAfterStyleChange();
-    });
-  };
-
-  document.getElementById('offline-cache-btn').onclick=()=>alert('💾 Map tiles are automatically cached by your browser for offline use');
-
-  document.querySelectorAll('.tab-btn').forEach(btn=>{
-    btn.onclick=()=>{
-      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
-      document.getElementById(`${btn.dataset.tab}-tab`).classList.add('active');
-    };
-  });
 }
 
 // ---------- Intro video fallback ----------
@@ -756,7 +556,7 @@ function startApp() {
 
         if (!map) {
             initMap();
-            bindEvents();
+            initUI();          // the interface, in ui.js
         }
     }, 800);
 }

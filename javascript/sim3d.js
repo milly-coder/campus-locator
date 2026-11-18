@@ -1,7 +1,8 @@
 /* =====================================================================
    3D CAMPUS + ROUTE PREVIEW  (add AFTER script.js in index2.html)
 
-   Reuses from script.js:  map, currentRouteGeometry, collapseSidebar
+   Reuses from script.js:  map, currentRouteGeometry
+   Used by ui.js through window.Sim3D (3D View button, place card, Preview in 3D)
    Does not change anything in script.js.
 
    What it adds
@@ -199,13 +200,13 @@
     cancelAnimationFrame(S.raf);
     ['mousedown', 'touchstart', 'wheel'].forEach(ev => map.off(ev, stopFly));
     const b = document.getElementById('simPreviewBtn');
-    if (b) b.innerHTML = '<i class="fas fa-play"></i> Preview route in 3D';
+    if (b) b.innerHTML = '<i class="fas fa-play"></i> Preview in 3D';
   }
 
   async function preview() {
     if (S.flying) return stopFly();
     if (typeof currentRouteGeometry === 'undefined' || !currentRouteGeometry) {
-      alert('Get a route first (Directions tab), then tap Preview.');
+      alert('Get directions first, then tap Preview in 3D.');
       return;
     }
     const coords = currentRouteGeometry.coordinates;
@@ -213,7 +214,7 @@
     if (total < 1) return;
 
     if (!S.on) await set3D(true);
-    if (typeof collapseSidebar === 'function') collapseSidebar(true);
+    if (typeof window.onSimPreview === 'function') window.onSimPreview();   // ui.js tucks the panel away
 
     const duration = Math.min(60000, Math.max(8000, total / FLY_SPEED * 1000));
     let bearing = bearingTo(coords[0], pointAlong(coords, Math.min(total, LOOK_AHEAD)));
@@ -243,44 +244,25 @@
   }
 
   /* ------------------------------- UI ------------------------------- */
-  function addPreviewButton(info) {
-    if (!info || info.style.display === 'none' || document.getElementById('simPreviewBtn')) return;
-    const p = document.createElement('button');
-    p.id = 'simPreviewBtn';
-    p.className = 'sim-preview-btn';
-    p.innerHTML = S.flying ? '<i class="fas fa-stop"></i> Stop preview' : '<i class="fas fa-play"></i> Preview route in 3D';
-    p.addEventListener('click', preview);
-    info.appendChild(p);
-  }
-
   function buildUI() {
-    const css = document.createElement('style');
-    css.textContent = `
-      .fab.sim-fab span{font:700 .95rem 'Poppins',sans-serif;letter-spacing:.02em;}
-      .fab.sim-fab.active{background:var(--green);border-color:rgba(255,255,255,.4);}
-      .sim-preview-btn{margin-top:10px;width:100%;padding:10px 14px;border:0;border-radius:12px;
-        background:var(--green);color:#fff;font:600 .9rem 'Inter',sans-serif;cursor:pointer;}
-      .sim-preview-btn i{margin-right:6px;}
-      .sim-preview-btn:active{transform:scale(.98);}`;
-    document.head.appendChild(css);
-
+    // round "3D View" button, placed before Live View and Settings
     btn3d = document.createElement('button');
     btn3d.className = 'fab sim-fab';
     btn3d.id = 'sim3d-btn';
-    btn3d.title = '3D campus';
-    btn3d.setAttribute('aria-label', 'Toggle 3D campus view');
+    btn3d.setAttribute('aria-label', 'Toggle 3D view of the campus');
     btn3d.setAttribute('aria-pressed', 'false');
-    btn3d.innerHTML = '<span>3D</span>';
+    btn3d.innerHTML = '<i class="fas fa-cube"></i><span class="fab-label">3D View</span>';
     btn3d.addEventListener('click', () => set3D(!S.on));
-    (document.querySelector('.fab-container') || document.body).appendChild(btn3d);
+    const box = document.querySelector('.fab-container') || document.body;
+    box.insertBefore(btn3d, document.getElementById('ar-btn') || document.getElementById('settings-btn'));   // before Live View
 
-    const info = document.getElementById('route-info');
-    if (info) {
-      // script.js rewrites route-info for every new route; add our button each time
-      new MutationObserver(() => addPreviewButton(info))
-        .observe(info, { childList: true, attributes: true, attributeFilter: ['style'] });
-    }
+    // "Preview in 3D" button in the directions panel (index2.html)
+    const pv = document.getElementById('simPreviewBtn');
+    if (pv) pv.addEventListener('click', preview);
   }
+
+  // for ui.js
+  window.Sim3D = { set3D: on => set3D(on), isOn: () => S.on, preview, stop: stopFly };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', buildUI);
   else buildUI();

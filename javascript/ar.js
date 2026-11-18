@@ -160,6 +160,7 @@
   /* ------------------------------ UI ------------------------------ */
   const S = {};
   let el = {};
+  let pendingDest = '';
 
   function resetState() {
     Object.assign(S, {
@@ -176,21 +177,21 @@
     const fab = document.createElement('button');
     fab.className = 'fab ar-fab';
     fab.id = 'ar-btn';
-    fab.title = 'AR navigation';
-    fab.setAttribute('aria-label', 'Open AR navigation');
-    fab.innerHTML = '<span>AR</span>';
-    (document.querySelector('.fab-container') || document.body).appendChild(fab);
+    fab.setAttribute('aria-label', 'Open Live View: camera guidance');
+    fab.innerHTML = '<i class="fas fa-camera"></i><span class="fab-label">Live View</span>';
+    const box = document.querySelector('.fab-container') || document.body;
+    box.insertBefore(fab, document.getElementById('settings-btn'));   // before Settings
 
     const wrap = document.createElement('div');
     wrap.className = 'ar-overlay';
     wrap.id = 'arOverlay';
     wrap.setAttribute('role', 'dialog');
-    wrap.setAttribute('aria-label', 'AR navigation');
+    wrap.setAttribute('aria-label', 'Live View navigation');
     wrap.innerHTML = `
       <video class="ar-video" id="arVideo" autoplay playsinline muted></video>
       <div class="ar-scrim"></div>
       <div class="ar-top">
-        <button class="ar-close" id="arClose" aria-label="Close AR"><i class="fas fa-xmark"></i></button>
+        <button class="ar-close" id="arClose" aria-label="Close Live View"><i class="fas fa-xmark"></i></button>
         <select class="ar-dest" id="arDest" aria-label="Destination"></select>
       </div>
       <div class="ar-pin" id="arPin">
@@ -245,7 +246,9 @@
   }
 
   function populateDestinations() {
-    const prefill = ((document.getElementById('dest-input') || {}).value || '').trim().toLowerCase();
+    // destination chosen on the place card, else the one in the Directions panel
+    const prefill = (pendingDest || ((document.getElementById('dest-input') || {}).value || '')).trim().toLowerCase();
+    pendingDest = '';
     el.dest.innerHTML = '';
     const first = document.createElement('option');
     first.value = ''; first.textContent = 'Choose a destination';
@@ -460,6 +463,9 @@
     el.debug.classList.remove('show');
     resetState();
   }
+
+  // for ui.js: open Live View already pointed at a place
+  window.openLiveView = function (destName) { pendingDest = destName || ''; openAR(); };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', buildUI);
   else buildUI();

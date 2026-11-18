@@ -38,65 +38,90 @@
 <div class="main-app" id="mainApp">
   <div id="map"></div>
 
-  <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-chevron-left"></i><span>Menu</span></button>
-
-  <div class="glass-sidebar" id="glassSidebar">
-    <div class="drag-handle" id="dragHandle"></div>
-    <div class="sidebar-header">
-      <img src="images/gimpa_logo.jpg" class="brand-logo" alt="GIMPA">
-      <div>
-        <h1>Campus<span>Locator
-          
-        </span></h1>
-        <div class="sub"><i class="fas fa-compass"></i> Live GPS · Voice Input · Hover for details</div>
-      </div>
+  <!-- Search bar and category chips (top of the screen, like Google Maps) -->
+  <div class="topbar" id="topbar">
+    <div class="searchbar" role="search">
+      <img src="images/gimpa_logo.jpg" class="search-logo" alt="">
+      <input type="search" id="search-input" placeholder="Search a building or office" aria-label="Search places on campus" autocomplete="off">
+      <button class="icon-btn voice-input-btn" id="voiceSearchBtn" aria-label="Search by voice"><i class="fas fa-microphone"></i></button>
+      <button class="icon-btn" id="searchClear" aria-label="Clear search" hidden><i class="fas fa-xmark fa-times"></i></button>
     </div>
-    <div class="tab-buttons">
-      <button class="tab-btn active" data-tab="search"><i class="fas fa-search"></i> Discover</button>
-      <button class="tab-btn" data-tab="directions"><i class="fas fa-route"></i> Directions</button>
-    </div>
-    <div class="tab-content">
-      <div class="tab-pane active" id="search-tab">
-        <div class="category-filters" id="category-filters">
-          <button class="cat-chip active" data-cat="all">✨ All</button>
-          <button class="cat-chip" data-cat="hostel">🏠 Hostels</button>
-          <button class="cat-chip" data-cat="lecture">📖 Lecture Halls</button>
-          <button class="cat-chip" data-cat="food">🍔 Food</button>
-          <button class="cat-chip" data-cat="admin">🏛️ Admin</button>
-        </div>
-        <div class="search-box">
-          <input type="text" id="search-input" placeholder="Type or select building...">
-          <button class="voice-input-btn" id="voiceSearchBtn"><i class="fas fa-microphone"></i></button>
-        </div>
-        <div id="search-results"></div>
-        <div class="small-note"><i class="fas fa-hand-pointer"></i> Hover a marker for a quick preview · tap to select</div>
-      </div>
-      <div class="tab-pane" id="directions-tab">
-        <div class="dir-input-group">
-          <label><i class="fas fa-play-circle"></i> Start point</label>
-          <div class="input-wrapper">
-            <input type="text" id="start-input" placeholder="My Location or building name">
-            <button class="voice-input-btn" id="voiceStartBtn"><i class="fas fa-microphone"></i></button>
-          </div>
-        </div>
-        <div class="dir-input-group">
-          <label><i class="fas fa-flag-checkered"></i> Destination</label>
-          <div class="input-wrapper">
-            <input type="text" id="dest-input" placeholder="Select building">
-            <button class="voice-input-btn" id="voiceDestBtn"><i class="fas fa-microphone"></i></button>
-          </div>
-        </div>
-        <button class="dir-btn" id="get-directions-btn"><i class="fas fa-route"></i> Get Route & Navigate</button>
-        <div class="route-info" id="route-info" style="display:none;"></div>
-      </div>
+    <div class="suggest-box" id="search-suggest" role="listbox" aria-label="Search suggestions"></div>
+    <div class="chips" id="category-filters" aria-label="Filter places">
+      <button class="cat-chip active" data-cat="all">All</button>
+      <button class="cat-chip" data-cat="hostel"><i class="fas fa-bed"></i> Hostels</button>
+      <button class="cat-chip" data-cat="lecture"><i class="fas fa-chalkboard-user fa-chalkboard-teacher"></i> Lecture Halls</button>
+      <button class="cat-chip" data-cat="food"><i class="fas fa-utensils"></i> Food</button>
+      <button class="cat-chip" data-cat="admin"><i class="fas fa-landmark"></i> Admin</button>
     </div>
   </div>
 
-  <div class="fab-container">
-    <button class="fab location-btn" id="locate-btn"><i class="fas fa-location-dot"></i></button>
-    <button class="fab dark-toggle" id="dark-mode-toggle"><i class="fas fa-moon"></i></button>
-    <button class="fab voice-fab" id="global-voice-nav"><i class="fas fa-microphone-alt"></i></button>
-    <button class="fab" id="offline-cache-btn"><i class="fas fa-database"></i></button>
+  <!-- Round buttons. 3D View and Live View are added by sim3d.js and ar.js, before Settings. -->
+  <div class="fab-container" id="fabs">
+    <button class="fab" id="locate-btn" aria-label="Show my location"><i class="fas fa-location-crosshairs fa-crosshairs"></i><span class="fab-label">Locate</span></button>
+    <button class="fab" id="settings-btn" aria-label="Settings"><i class="fas fa-gear fa-cog"></i><span class="fab-label">Settings</span></button>
+  </div>
+
+  <!-- Bottom sheet: a place card, or directions -->
+  <section class="sheet" id="sheet" hidden>
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <button class="icon-btn sheet-close" id="sheetClose" aria-label="Close"><i class="fas fa-xmark fa-times"></i></button>
+
+    <div id="placeView">
+      <div class="place-media"><img id="placeImg" alt=""></div>
+      <div class="place-head"><span class="popup-code" id="placeCode" hidden></span><h2 id="placeName"></h2></div>
+      <div class="place-official" id="placeOfficial"></div>
+      <p class="place-desc" id="placeDesc"></p>
+      <div class="place-source" id="placeSource"></div>
+      <div class="place-actions">
+        <button class="btn primary" id="btnDirections"><i class="fas fa-route"></i> Directions</button>
+        <button class="btn" id="btnPlace3d"><i class="fas fa-cube"></i> 3D View</button>
+        <button class="btn" id="btnPlaceLive"><i class="fas fa-camera"></i> Live View</button>
+      </div>
+    </div>
+
+    <div id="dirView" hidden>
+      <div class="dir-header">
+        <button class="icon-btn" id="dirBack" aria-label="Back to place"><i class="fas fa-arrow-left"></i></button>
+        <h2>Directions</h2>
+      </div>
+      <div class="dir-fields">
+        <div class="dir-row"><i class="fas fa-circle-dot fa-dot-circle from" aria-hidden="true"></i>
+          <input type="text" id="start-input" value="My Location" aria-label="Starting point" placeholder="Starting point">
+          <button class="icon-btn voice-input-btn" id="voiceStartBtn" aria-label="Say the starting point"><i class="fas fa-microphone"></i></button></div>
+        <div class="dir-row"><i class="fas fa-location-dot fa-map-marker-alt to" aria-hidden="true"></i>
+          <input type="text" id="dest-input" aria-label="Destination" placeholder="Destination">
+          <button class="icon-btn voice-input-btn" id="voiceDestBtn" aria-label="Say the destination"><i class="fas fa-microphone"></i></button></div>
+      </div>
+      <div class="route-summary" id="routeSummary" aria-live="polite"></div>
+      <div class="place-actions" id="routeActions" hidden>
+        <button class="btn" id="simPreviewBtn"><i class="fas fa-play"></i> Preview in 3D</button>
+        <button class="btn" id="btnRouteLive"><i class="fas fa-camera"></i> Live View</button>
+      </div>
+      <details class="route-steps" id="routeStepsWrap" hidden><summary>Step-by-step</summary><ol id="routeSteps"></ol></details>
+    </div>
+  </section>
+
+  <!-- Settings -->
+  <div class="settings-backdrop" id="settingsPanel" hidden>
+    <div class="settings-card" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <div class="settings-head"><h2 id="settingsTitle">Settings</h2>
+        <button class="icon-btn" id="settingsClose" aria-label="Close settings"><i class="fas fa-xmark fa-times"></i></button></div>
+      <label class="set-row"><span><b>Dark mode</b><small>Darker map, easier at night</small></span>
+        <input type="checkbox" role="switch" class="switch" id="setDark"></label>
+      <label class="set-row"><span><b>Voice guidance</b><small>Spoken route updates and arrival</small></span>
+        <input type="checkbox" role="switch" class="switch" id="setVoiceGuide"></label>
+      <label class="set-row"><span><b>Voice input</b><small>Show the microphone in search boxes</small></span>
+        <input type="checkbox" role="switch" class="switch" id="setVoiceInput"></label>
+      <div class="set-row"><span><b>Send feedback</b><small id="feedbackNote">Tell us what worked and what didn't</small></span>
+        <a class="btn small" id="feedbackLink" href="#" target="_blank" rel="noopener">Open form</a></div>
+      <details class="set-about"><summary><b>About this app</b></summary>
+        <p>GIMPA Campus Locator, by Millicent Tumaku. Routes follow campus footpaths traced in QGIS.
+        Building codes and descriptions: Estates and Municipal Services Directorate (EMSD), GIMPA.
+        Map data &copy; Mapbox &copy; OpenStreetMap.</p>
+        <p><a href="https://github.com/milly-coder/campus-locator" target="_blank" rel="noopener">github.com/milly-coder/campus-locator</a></p>
+      </details>
+    </div>
   </div>
 </div>
 
@@ -104,5 +129,6 @@
 <script src="javascript/script.js"></script>
 <script src="javascript/ar.js"></script>
 <script src="javascript/sim3d.js"></script>
+<script src="javascript/ui.js"></script>
 </body>
 </html>

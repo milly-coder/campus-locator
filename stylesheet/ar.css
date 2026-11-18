@@ -1,6 +1,5 @@
-/* ============ OUTDOOR AR NAVIGATION ============ */
-.fab.ar-fab{background:linear-gradient(135deg,var(--gold),var(--gold-dark));color:#1a1200;}
-.fab.ar-fab span{font:700 .95rem 'Poppins',sans-serif;letter-spacing:.02em;}
+/* ============ LIVE VIEW (outdoor AR navigation) ============ */
+.fab.ar-fab{background:var(--gold);color:#1a1200;}
 
 .ar-overlay{
   position:fixed;inset:0;z-index:2000;display:none;overflow:hidden;
