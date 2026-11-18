@@ -17,7 +17,7 @@
   'use strict';
 
   // Paste your Google Form link here (Send > link icon > Copy).
-  const FEEDBACK_URL = '';
+  const FEEDBACK_URL = 'https://forms.gle/k4RDpDgu3WUUES8r5';
 
   const $ = id => document.getElementById(id);
   const isPhone = () => window.matchMedia('(max-width:768px)').matches;
