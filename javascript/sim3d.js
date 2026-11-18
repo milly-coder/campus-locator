@@ -26,15 +26,17 @@
 (function () {
   'use strict';
 
-  const FLY_PITCH   = 65;    // camera tilt during the preview (0 = top-down)
-  const FLY_ZOOM    = 18.3;  // how close the camera is during the preview
+  // camera during the route preview: 3D is tilted over the raised buildings,
+  // 2D looks straight down on the satellite map
+  const FLY = { '3d': { pitch: 65, zoom: 18.3 }, '2d': { pitch: 0, zoom: 17.8 } };
+  const LABELS = { prev2d: '<i class="fas fa-play"></i> Preview 2D', prev3d: '<i class="fas fa-play"></i> Preview 3D' };
   const FLY_SPEED   = 12;    // metres of route per second of animation
   const LOOK_AHEAD  = 25;    // metres ahead the camera faces
   const FLAT_PITCH  = 42;    // same tilt the map starts with in script.js
 
   const OWN_LAYER   = 'campus-buildings';   // your layer in Mapbox Studio
   const OWN_3D_PAINT = {                     // how it looks in 3D mode
-    'fill-extrusion-color': '#EFE7D6',       // light stone, like GIMPA's walls
+    'fill-extrusion-color': '#E2CBA4',       // warm sand, like GIMPA's walls and roofs
     'fill-extrusion-opacity': 1,             // solid: nothing shows through
     'fill-extrusion-base': 0,                // start on the ground...
     'fill-extrusion-height': 14              // ...and rise about 3 storeys
@@ -199,21 +201,27 @@
     S.flying = false;
     cancelAnimationFrame(S.raf);
     ['mousedown', 'touchstart', 'wheel'].forEach(ev => map.off(ev, stopFly));
-    const b = document.getElementById('simPreviewBtn');
-    if (b) b.innerHTML = '<i class="fas fa-play"></i> Preview in 3D';
+    Object.keys(LABELS).forEach(id => { const b = document.getElementById(id); if (b) b.innerHTML = LABELS[id]; });
   }
 
-  async function preview() {
-    if (S.flying) return stopFly();
+  // mode: '2d' (flat, over the satellite map) or '3d' (tilted, buildings raised)
+  async function preview(mode) {
+    mode = mode === '2d' ? '2d' : '3d';
+    const wasFlying = S.flying, wasMode = S.mode;
+    if (S.flying) stopFly();
+    if (wasFlying && wasMode === mode) return;            // the same button again = stop
     if (typeof currentRouteGeometry === 'undefined' || !currentRouteGeometry) {
-      alert('Get directions first, then tap Preview in 3D.');
+      alert('Get directions first, then tap Preview.');
       return;
     }
+    S.mode = mode;
+    const cam = FLY[mode];
     const coords = currentRouteGeometry.coordinates;
     const total = lineLength(coords);
     if (total < 1) return;
 
-    if (!S.on) await set3D(true);
+    if (mode === '3d' && !S.on) await set3D(true);
+    if (mode === '2d' && S.on) await set3D(false);
     if (typeof window.onSimPreview === 'function') window.onSimPreview();   // ui.js tucks the panel away
 
     const duration = Math.min(60000, Math.max(8000, total / FLY_SPEED * 1000));
@@ -221,12 +229,12 @@
     let t0 = null;
 
     S.flying = true;
-    const b = document.getElementById('simPreviewBtn');
-    if (b) b.innerHTML = '<i class="fas fa-stop"></i> Stop preview';
+    const b = document.getElementById(mode === '2d' ? 'prev2d' : 'prev3d');
+    if (b) b.innerHTML = '<i class="fas fa-stop"></i> Stop';
     // any touch on the map hands control back to the user
     ['mousedown', 'touchstart', 'wheel'].forEach(ev => map.on(ev, stopFly));
 
-    map.jumpTo({ center: coords[0], zoom: FLY_ZOOM, pitch: FLY_PITCH, bearing });
+    map.jumpTo({ center: coords[0], zoom: cam.zoom, pitch: cam.pitch, bearing });
 
     const step = now => {
       if (!S.flying) return;
@@ -236,7 +244,7 @@
       const here = pointAlong(coords, d);
       const ahead = pointAlong(coords, Math.min(total, d + LOOK_AHEAD));
       if (meters(here, ahead) > 1) bearing += norm180(bearingTo(here, ahead) - bearing) * 0.06;
-      map.jumpTo({ center: here, bearing, zoom: FLY_ZOOM, pitch: FLY_PITCH });
+      map.jumpTo({ center: here, bearing, zoom: cam.zoom, pitch: cam.pitch });
       if (k < 1) S.raf = requestAnimationFrame(step);
       else stopFly();
     };
@@ -256,9 +264,10 @@
     const box = document.querySelector('.fab-container') || document.body;
     box.insertBefore(btn3d, document.getElementById('ar-btn') || document.getElementById('settings-btn'));   // before Live View
 
-    // "Preview in 3D" button in the directions panel (index2.html)
-    const pv = document.getElementById('simPreviewBtn');
-    if (pv) pv.addEventListener('click', preview);
+    // "Preview 2D" and "Preview 3D" buttons in the directions panel (index2.html)
+    const p2 = document.getElementById('prev2d'), p3 = document.getElementById('prev3d');
+    if (p2) p2.addEventListener('click', () => preview('2d'));
+    if (p3) p3.addEventListener('click', () => preview('3d'));
   }
 
   // for ui.js
