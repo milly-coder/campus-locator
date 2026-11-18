@@ -47,6 +47,7 @@
   /* --------------------------- bottom sheet --------------------------- */
   let place = null;           // the building shown on the place card
   let routeOptions = [];      // campus-path and Mapbox routes, shortest first
+  let shownIndex = 0;         // which of them is on the map
 
   function setSheetHeight() {
     const sh = $('sheet');
@@ -121,20 +122,20 @@
     const summary = $('routeSummary');
     $('routeActions').hidden = true;
     $('routeStepsWrap').hidden = true;
-    if (!startTxt || !destTxt) { summary.innerHTML = '<p class="route-msg">Choose a starting point and a destination.</p>'; return; }
+    if (!startTxt || !destTxt) { summary.innerHTML = '<p class="route-msg">Choose a starting point and a destination.</p>'; return false; }
     summary.innerHTML = '<p class="route-msg"><i class="fas fa-spinner fa-spin"></i> Finding the best route…</p>';
 
     if ((isMyLocation(startTxt) || isMyLocation(destTxt)) && !currentPosition) {
       const pos = await getFreshPosition();
-      if (run !== routeRun) return;
+      if (run !== routeRun) return false;
       if (!pos) {
         summary.innerHTML = '<p class="route-msg">Couldn\'t get your location. Turn on location (GPS) and allow this site to use it, or type a starting building.</p>';
-        return;
+        return false;
       }
     }
 
     const options = [];
-    const custom = getCustomRoute(startTxt, destTxt);
+    const custom = campusRoute(startTxt, destTxt);
     if (custom) options.push(Object.assign({ label: 'Campus paths', isCustom: true }, custom));
     const startCoord = custom ? custom.startCoord : await resolveLocation(startTxt);
     const endCoord = custom ? custom.destCoord : await resolveLocation(destTxt);
@@ -145,19 +146,36 @@
           steps: road.legs[0].steps.map(st => st.maneuver.instruction), startCoord, destCoord: endCoord });
       } catch (e) { /* offline or no road route: campus paths only */ }
     }
-    if (run !== routeRun) return;
+    if (run !== routeRun) return false;
     if (!options.length) {
       summary.innerHTML = '<p class="route-msg">No walking route found. Try picking both places from the list.</p>';
-      return;
+      return false;
     }
     options.sort((x, y) => x.distance - y.distance);
     routeOptions = options;
     showRoute(0);
+    return true;
+  }
+
+  // Campus-path route. From "My Location" it joins the path at the nearest point
+  // (not the nearest junction, which can be behind you), the same way Live View does.
+  function campusRoute(startTxt, destTxt) {
+    const dest = isMyLocation(destTxt) ? null : findBuilding(destTxt);
+    if (isMyLocation(startTxt) && currentPosition && dest && window.routeFromPosition) {
+      const destCoord = [dest.lng, dest.lat];
+      const r = routeFromPosition(currentPosition, destCoord);
+      if (r && r.onNetwork) {
+        return { geometry: { type: 'LineString', coordinates: r.coords }, distance: r.length, steps: [],
+          startCoord: currentPosition, destCoord };
+      }
+    }
+    return getCustomRoute(startTxt, destTxt);
   }
 
   function showRoute(i) {
     const o = routeOptions[i];
     if (!o) return;
+    shownIndex = i;
     renderRoute(o.geometry, o.distance, o.steps, o.startCoord, o.destCoord, o.isCustom);
     let html = `<div class="route-main"><span class="route-time">${mins(o.distance)}</span><span class="route-dist">${km(o.distance)}</span></div>
       <div class="route-choice">${esc(o.label)}${routeOptions.length > 1 && i === 0 ? ' · shortest' : ''}</div>`;
@@ -169,12 +187,67 @@
     $('routeSummary').innerHTML = html;
     const alt = $('routeSummary').querySelector('.route-alt-btn');
     if (alt) alt.onclick = () => showRoute(+alt.dataset.i);
-    $('routeSteps').innerHTML = (o.steps || []).map(st => `<li>${esc(st)}</li>`).join('');
-    $('routeStepsWrap').hidden = !(o.steps || []).length;
+    // campus routes: the same turn-by-turn wording the voice uses; Mapbox: its own instructions
+    const steps = (o.isCustom && window.Nav) ? Nav.describe(o.geometry.coordinates) : (o.steps || []);
+    $('routeSteps').innerHTML = steps.map(st => `<li>${esc(st)}</li>`).join('');
+    $('routeStepsWrap').hidden = !steps.length;
     $('routeActions').hidden = false;
     requestAnimationFrame(() => {
       setSheetHeight();
       map.fitBounds(new mapboxgl.LngLatBounds().extend(o.startCoord).extend(o.destCoord), { padding: mapPadding(), maxZoom: 18 });
+    });
+  }
+
+  /* ------------------------- navigation (Start) ------------------------- */
+  // Names are stored in capitals; read them as words ("Library Block"), keeping real acronyms
+  const ACRONYMS = new Set(['GIMPA', 'SOTSS', 'GB', 'UN', 'CIDA', 'YALI', 'PSMPT', 'MTN', 'SRC', 'EMSD', 'GECC', 'GTC', 'CITD', 'PURC', 'IRC', 'CRIA']);
+  const spoken = name => name.replace(/[A-Za-z']+/g, w => ACRONYMS.has(w.toUpperCase()) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+
+  // Phones only allow speech that starts from a tap; a silent sentence now unlocks it for later
+  function unlockSpeech() {
+    try { if (window.speechSynthesis) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } } catch (e) { /* no speech */ }
+  }
+
+  // a new route from where the user is now (navigate.js calls this when they stray)
+  async function reroute(p) {
+    currentPosition = p;
+    const dest = $('dest-input').value.trim();
+    const opts = [];
+    const c = campusRoute('My Location', dest);
+    if (c) opts.push(Object.assign({ label: 'Campus paths', isCustom: true }, c));
+    const end = c ? c.destCoord : await resolveLocation(dest);
+    if (end) {
+      try {
+        const road = await getWalkingRoute(p, end);
+        opts.push({ label: 'Mapbox walking route', isCustom: false, geometry: road.geometry, distance: road.distance,
+          steps: road.legs[0].steps.map(st => st.maneuver.instruction), startCoord: p, destCoord: end });
+      } catch (e) { /* campus paths only */ }
+    }
+    if (!opts.length) return null;
+    opts.sort((x, y) => x.distance - y.distance);
+    routeOptions = opts; shownIndex = 0;
+    const o = opts[0];
+    renderRoute(o.geometry, o.distance, o.steps, o.startCoord, o.destCoord, o.isCustom);
+    return o;
+  }
+
+  async function startNavigation() {
+    unlockSpeech();
+    if (!isMyLocation($('start-input').value)) {          // navigation always starts from where you are
+      $('start-input').value = 'My Location';
+      const ok = await computeRoute();
+      if (!ok) return;
+    }
+    const o = routeOptions[shownIndex];
+    if (!o) return;
+    if (window.Sim3D) Sim3D.stop();
+    const destKey = $('dest-input').value.trim();
+    const b = findBuilding(destKey);
+    hideSheet();
+    Nav.start(o, {
+      destName: spoken(b ? b.name : destKey), destKey: b ? b.name : destKey,
+      onReroute: reroute, feedbackUrl: FEEDBACK_URL,
+      onEnd: () => { clearRoute(); if (place) openPlace(place.name); }
     });
   }
 
@@ -298,6 +371,7 @@
     $('voiceDestBtn').onclick = () => listen(destBox, $('voiceDestBtn'), () => computeRoute());
     $('dirBack').onclick = () => { clearRoute(); if (place) openPlace(place.name); else hideSheet(); };
     $('btnRouteLive').onclick = () => { if (window.openLiveView) openLiveView(destBox.value); };
+    $('btnStart').onclick = startNavigation;
     window.onSimPreview = () => { if (isPhone()) hideSheet(); };   // see the whole screen during the fly-through
 
     // sheet close

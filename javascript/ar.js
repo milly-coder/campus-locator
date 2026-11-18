@@ -168,7 +168,8 @@
       hx: 0, hy: 0, hasHeading: false, heading: null, compassDenied: false,
       route: null, targetBearing: null, destBearing: null, destStraight: null, arrived: false,
       arrowAngle: 0, watchId: null, stream: null, raf: 0,
-      geoErr: null, cameraErr: null, lastMsg: '', lastPin: ''
+      geoErr: null, cameraErr: null, lastMsg: '', lastPin: '',
+      voice: { said: '', at: 0, pending: '', since: 0, arrived: false, offWarned: false, started: '' }
     });
   }
   resetState();
@@ -353,6 +354,10 @@
     S.destStraight = haversineMeters(S.userPos, dc);
     const arriveAt = Math.max(ARRIVE_M, Math.min(S.accuracy || 0, 30));
     S.arrived = S.destStraight < arriveAt || S.route.length < arriveAt;
+    // voice: once per destination, then a warning if the user is far from the path
+    if (S.voice.started !== dest.name && !S.arrived) { S.voice.started = dest.name; S.voice.arrived = false; say('Follow the arrow to ' + spokenName(dest.name) + '.'); }
+    if (S.route.onNetwork && S.route.offPath > 25 && !S.voice.offWarned) { S.voice.offWarned = true; say('You are away from the path. Head back towards it.'); }
+    if (S.route.offPath != null && S.route.offPath < 15) S.voice.offWarned = false;
     renderStats();
   }
 
@@ -393,6 +398,7 @@
       msg = instructionFor(rel) + (S.route && !S.route.onNetwork && !S.route.quiet ? ' (straight line, off the campus paths)' : '');
     }
     setText(el.msg, 'lastMsg', msg);
+    speakGuide(msg, dest);
 
     // ground arrow
     if (rel !== null) {
@@ -433,9 +439,34 @@
     ].join('\n');
   }
 
+  /* ------------------------------ voice ------------------------------ */
+  function say(text) { if (typeof speakText === 'function') speakText(text); }
+  const spokenName = n => n.replace(/[A-Za-z']+/g, w => /^(GIMPA|SOTSS|GB|UN|CIDA|YALI|PSMPT|MTN|SRC|EMSD|GECC|GTC|CITD|PURC|IRC|CRIA)$/i.test(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  // Speaks turn instructions when they change. An instruction must hold for 1.5 s
+  // (the compass wobbles), with at least 5 s between sentences.
+  function speakGuide(msg, dest) {
+    const v = S.voice, now = Date.now();
+    if (S.arrived) {
+      if (!v.arrived && dest) { v.arrived = true; say('You have arrived at ' + spokenName(dest.name) + '.'); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) { /* no vibration */ } }
+      return;
+    }
+    if (!/^(Turn|Bear|Keep going)/.test(msg)) return;
+    const key = msg.replace(/ \(.*\)$/, '');
+    if (key !== v.pending) { v.pending = key; v.since = now; return; }
+    if (now - v.since < 1500 || key === v.said || now - v.at < 5000) return;
+    if (key === 'Keep going straight' && !/^(Turn|Bear)/.test(v.said)) return;   // only after a turn
+    v.said = key; v.at = now;
+    say(key + '.');
+  }
+  // phones only allow speech that starts from a tap: a silent sentence now unlocks it
+  function unlockSpeech() {
+    try { if (window.speechSynthesis) { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } } catch (e) { /* no speech */ }
+  }
+
   /* --------------------------- open / close --------------------------- */
   async function openAR() {
     if (S.open) return;
+    unlockSpeech();
     resetState();
     S.open = true;
     el.overlay.classList.add('open');
@@ -463,6 +494,9 @@
     el.debug.classList.remove('show');
     resetState();
   }
+
+  // for ui.js and navigation: route from a GPS position, joining the path at its nearest point
+  window.routeFromPosition = (pos, destCoord) => computeRoute(pos, destCoord);
 
   // for ui.js: open Live View already pointed at a place
   window.openLiveView = function (destName) { pendingDest = destName || ''; openAR(); };

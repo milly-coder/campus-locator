@@ -95,12 +95,35 @@
       </div>
       <div class="route-summary" id="routeSummary" aria-live="polite"></div>
       <div class="place-actions" id="routeActions" hidden>
+        <button class="btn primary" id="btnStart"><i class="fas fa-location-arrow"></i> Start</button>
         <button class="btn" id="simPreviewBtn"><i class="fas fa-play"></i> Preview in 3D</button>
         <button class="btn" id="btnRouteLive"><i class="fas fa-camera"></i> Live View</button>
       </div>
       <details class="route-steps" id="routeStepsWrap" hidden><summary>Step-by-step</summary><ol id="routeSteps"></ol></details>
     </div>
   </section>
+
+  <!-- Navigation mode (after Start) -->
+  <div class="nav-top" id="navTop" hidden aria-live="polite">
+    <div class="nav-icon" id="navIcon"><i class="fas fa-arrow-up"></i></div>
+    <div class="nav-text"><div class="nav-dist" id="navDist"></div><div class="nav-instr" id="navInstr"></div></div>
+  </div>
+  <button class="recenter" id="navRecenter" hidden><i class="fas fa-location-arrow"></i> Re-centre</button>
+  <div class="nav-bottom" id="navBottom" hidden>
+    <div class="nav-remain"><b id="navTime"></b><span id="navLeft"></span></div>
+    <button class="icon-btn" id="navMute" aria-label="Mute voice"><i class="fas fa-volume-high fa-volume-up"></i></button>
+    <button class="btn small" id="navLive"><i class="fas fa-camera"></i> Live View</button>
+    <button class="btn small danger" id="navEnd">End</button>
+  </div>
+  <div class="arrive-card" id="arriveCard" hidden role="dialog" aria-labelledby="arriveTitle">
+    <div class="arrive-icon"><i class="fas fa-flag-checkered"></i></div>
+    <h2 id="arriveTitle">You have arrived</h2>
+    <p id="arrivePlace"></p>
+    <div class="place-actions">
+      <a class="btn" id="arriveFeedback" target="_blank" rel="noopener">Give feedback</a>
+      <button class="btn primary" id="arriveDone">Done</button>
+    </div>
+  </div>
 
   <!-- Settings -->
   <div class="settings-backdrop" id="settingsPanel" hidden>
@@ -129,6 +152,7 @@
 <script src="javascript/script.js"></script>
 <script src="javascript/ar.js"></script>
 <script src="javascript/sim3d.js"></script>
+<script src="javascript/navigate.js"></script>
 <script src="javascript/ui.js"></script>
 </body>
 </html>

@@ -485,7 +485,7 @@ function renderRoute(geometry,distanceMeters,steps,startCoord,endCoord,isCustom)
 
   isNavigating=true;
   setPathsNetworkDim(true);
-  if(isMyLocation(document.getElementById('start-input').value)) startTracking();
+  if(isMyLocation(document.getElementById('start-input').value) && !(window.Nav && Nav.active)) startTracking();
 }
 
 // Start following the user's location, without switching it off if it's already on
@@ -494,6 +494,11 @@ function startTracking(){
   if(!geolocateControl) return;
   const st=geolocateControl._watchState;
   if(!st || st==='OFF' || st==='BACKGROUND') geolocateControl.trigger();
+}
+// Switch Mapbox's location tracking off (navigation mode moves the camera itself)
+function stopTracking(){
+  if(!geolocateControl) return;
+  for(let i=0;i<3 && geolocateControl._watchState && geolocateControl._watchState!=='OFF';i++) geolocateControl.trigger();
 }
 
 // Ask the browser for the current position once (used when "My Location" has no fix yet)
