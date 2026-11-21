@@ -398,8 +398,11 @@ function filterBuildingsByCategory(cat){
 }
 
 function initMap(){
-  map=new mapboxgl.Map({container:'map',style:lightStyle,center:[-0.200,5.635],zoom:15.5,pitch:42});
-  map.addControl(new mapboxgl.NavigationControl(),'bottom-right');
+  map=new mapboxgl.Map({container:'map',style:lightStyle,center:[-0.200,5.635],zoom:15.5,pitch:42,attributionControl:false});
+  // zoom buttons only (no compass); they show on laptops and are hidden on phones
+  map.addControl(new mapboxgl.NavigationControl({showCompass:false}),'bottom-right');
+  // credits shrink to a small "i" next to the Mapbox logo; tap it to see them (required by Mapbox)
+  map.addControl(new mapboxgl.AttributionControl({compact:true}),'bottom-left');
 
   // Live location puck: shows an arrow that points the direction you're facing/moving,
   // and re-centers the map on you as you walk (same as Google Maps' blue navigation dot).
